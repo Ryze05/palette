@@ -1,11 +1,21 @@
 package com.example.palette
 
 import android.R.attr.type
+import android.app.Activity
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +56,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -56,6 +71,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.palette.graphics.Palette
 import com.example.palette.ui.theme.PaletteTheme
 
 class MainActivity : ComponentActivity() {
@@ -66,14 +82,29 @@ class MainActivity : ComponentActivity() {
             PaletteTheme {
 
                 val navController = rememberNavController()
+                val context = LocalContext.current
                 var texto by remember { mutableStateOf("StaggeredGrid") }
+
+                var appBarColor by remember { mutableStateOf(Color(0xFF005CB2)) }
+                var statusBarColor by remember { mutableStateOf(Color(0xFF005CB2)) }
+                var onAppBarColor by remember { mutableStateOf(Color.White) }
+                var currentSwatches by remember { mutableStateOf<List<Pair<String, Palette.Swatch?>>>(emptyList()) }
+
+                val animatedAppBarColor by animateColorAsState(targetValue = appBarColor, label = "colorAnim")
+
+                val view = LocalView.current
+                SideEffect {
+                    val window = (view.context as Activity).window
+                    window.statusBarColor = statusBarColor.toArgb()
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
-                        TopAppBar(
-                            onChangeText = { texto = it },
-                            //onMenuClick = { navController.navigate("menu") }
+                        MyTopAppBar(
+                            animatedAppBarColor,
+                            onAppBarColor,
+                            onChangeText = { texto = it }
                         )
                     },
                     floatingActionButton = {
@@ -94,9 +125,16 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = "main"
+                        startDestination = "main",
+                        enterTransition = { fadeIn(animationSpec = tween(700)) + slideInHorizontally() },
+                        exitTransition = { fadeOut(animationSpec = tween(700)) + slideOutHorizontally() }
                     ) {
                         composable("main") {
+                            LaunchedEffect(Unit) {
+                                appBarColor = Color(0xFF005CB2)
+                                statusBarColor = Color(0xFF005CB2)
+                                onAppBarColor = Color.White
+                            }
                             MainScreen(
                                 modifier = Modifier.padding(innerPadding),
                                 texto,
@@ -104,13 +142,48 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(
-                            "screen2/{title}/{imageRes}",
+                            "screen2/{imageRes}",
                             arguments = listOf(
                                 navArgument("imageRes") { type = NavType.IntType }
                             )
                         ) { backStackEntry ->
-                            val title = backStackEntry.arguments?.getString("title") ?: ""
                             val imageRes = backStackEntry.arguments?.getInt("imageRes") ?: 0
+
+                            LaunchedEffect(imageRes) {
+                                val bitmap = BitmapFactory.decodeResource(context.resources, imageRes)
+                                Palette.from(bitmap).generate {
+                                    it?.let {
+                                        //Vibrant
+                                        appBarColor = it.vibrantSwatch?.rgb?.let { Color(it) } ?: Color.Blue
+                                        onAppBarColor = it.vibrantSwatch?.bodyTextColor?.let { Color(it) } ?: Color.White
+
+                                        //Dark Vibrant
+                                        statusBarColor = it.darkVibrantSwatch?.rgb?.let { Color(it) } ?: Color.Black
+
+                                        currentSwatches = listOf(
+                                            "Light Vibrant" to it.lightVibrantSwatch,
+                                            "Dark Vibrant" to it.darkVibrantSwatch,
+                                            "Light Muted" to it.lightMutedSwatch,
+                                            "Muted" to it.mutedSwatch,
+                                            "Dark Muted" to it.darkMutedSwatch
+                                        )
+                                    }
+                                }
+                            }
+
+                            var visible by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) { visible = true }
+
+                            AnimatedVisibility(
+                                visible = visible,
+                                enter = slideInVertically() + fadeIn()
+                            ) {
+                                Screen2(
+                                    modifier = Modifier.padding(innerPadding),
+                                    imageRes = imageRes,
+                                    swatches = currentSwatches
+                                )
+                            }
 
                             /*Screen2(
                                 modifier = Modifier.padding(innerPadding),
@@ -163,7 +236,7 @@ fun MainScreen(modifier: Modifier = Modifier, texto: String, navController: NavC
                 items(images) {
                     Box(
                         modifier = Modifier.clickable {
-                            navController.navigate("screen2/${it.title}/${it.drawable}")
+                            navController.navigate("screen2/${it.drawable}")
                         }
                     ) {
                         Image(
@@ -230,14 +303,18 @@ fun MainScreen(modifier: Modifier = Modifier, texto: String, navController: NavC
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopAppBar(onChangeText: (String) -> Unit/*, onMenuClick: () -> Unit*/) {
+fun MyTopAppBar(
+    containerColor: Color,
+    titleContentColor: Color,
+    onChangeText: (String) -> Unit
+) {
 
     var expanded by remember { mutableStateOf(false) }
 
     TopAppBar(
         title = { Text("Palette") },
         navigationIcon = {
-            IconButton(onClick = { /*onMenuClick()*/ }) {
+            IconButton(onClick = { }) {
                 Icon(Icons.Default.Menu, contentDescription = "Menú")
             }
         },
@@ -245,32 +322,16 @@ fun TopAppBar(onChangeText: (String) -> Unit/*, onMenuClick: () -> Unit*/) {
             IconButton(onClick = { expanded = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = "Buscar")
             }
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("LazyColumn") },
-                    onClick = {
-                        expanded = false
-                        onChangeText("LazyColumn")
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("StaggeredGrid") },
-                    onClick = {
-                        expanded = false
-                        onChangeText("StaggeredGrid")
-                    }
-                )
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(text = { Text("LazyColumn") }, onClick = { expanded = false; onChangeText("LazyColumn") })
+                DropdownMenuItem(text = { Text("StaggeredGrid") }, onClick = { expanded = false; onChangeText("StaggeredGrid") })
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color(0xFF005CB2),
-            titleContentColor = Color.White,
-            navigationIconContentColor = Color.White,
-            actionIconContentColor = Color.White
+            containerColor = containerColor,
+            titleContentColor = titleContentColor,
+            navigationIconContentColor = titleContentColor,
+            actionIconContentColor = titleContentColor
         )
     )
 }
