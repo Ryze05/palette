@@ -27,32 +27,29 @@ fun Screen2(
     imageRes: Int,
     swatches: List<Pair<String, Palette.Swatch?>>
 ) {
-    LazyColumn(
+    Column(
         modifier = modifier.fillMaxSize()
     ) {
-        item {
-            Image(
-                painter = painterResource(imageRes),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        items(swatches) { (name, swatch) ->
+        Image(
+            painter = painterResource(imageRes),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(2.5f),
+            contentScale = ContentScale.Crop
+        )
+        swatches.forEach { (name, swatch) ->
             if (swatch != null) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(swatch.rgb))
-                        .padding(20.dp),
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(Color(swatch.rgb)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = name,
-                        color = Color(swatch.bodyTextColor),
+                        color = Color(swatch.titleTextColor),
                         fontWeight = FontWeight.Bold
                     )
                 }

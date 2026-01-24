@@ -126,8 +126,8 @@ class MainActivity : ComponentActivity() {
                     NavHost(
                         navController = navController,
                         startDestination = "main",
-                        enterTransition = { fadeIn(animationSpec = tween(700)) + slideInHorizontally() },
-                        exitTransition = { fadeOut(animationSpec = tween(700)) + slideOutHorizontally() }
+                        enterTransition = { fadeIn(animationSpec = tween(900)) + slideInHorizontally() },
+                        exitTransition = { fadeOut(animationSpec = tween(900)) + slideOutHorizontally() }
                     ) {
                         composable("main") {
                             LaunchedEffect(Unit) {
@@ -151,15 +151,15 @@ class MainActivity : ComponentActivity() {
 
                             LaunchedEffect(imageRes) {
                                 val bitmap = BitmapFactory.decodeResource(context.resources, imageRes)
-                                Palette.from(bitmap).generate {
-                                    it?.let {
-                                        //Vibrant
-                                        appBarColor = it.vibrantSwatch?.rgb?.let { Color(it) } ?: Color.Blue
-                                        onAppBarColor = it.vibrantSwatch?.bodyTextColor?.let { Color(it) } ?: Color.White
+                                Palette.from(bitmap).generate { palette ->
+                                    palette?.let {
+                                        val vibrant = it.vibrantSwatch
+                                        appBarColor = vibrant?.rgb?.let { Color(it) } ?: Color(0xFF005CB2)
+                                        onAppBarColor = vibrant?.titleTextColor?.let { Color(it) } ?: Color.White
 
-                                        //Dark Vibrant
-                                        statusBarColor = it.darkVibrantSwatch?.rgb?.let { Color(it) } ?: Color.Black
-
+                                        statusBarColor = it.darkVibrantSwatch?.rgb?.let { Color(it) }
+                                            ?: it.vibrantSwatch?.rgb?.let { Color(it) }
+                                                    ?: Color(0xFF004080)
                                         currentSwatches = listOf(
                                             "Light Vibrant" to it.lightVibrantSwatch,
                                             "Dark Vibrant" to it.darkVibrantSwatch,
@@ -184,12 +184,6 @@ class MainActivity : ComponentActivity() {
                                     swatches = currentSwatches
                                 )
                             }
-
-                            /*Screen2(
-                                modifier = Modifier.padding(innerPadding),
-                                title,
-                                imageRes
-                            )*/
                         }
                     }
                 }
@@ -270,7 +264,11 @@ fun MainScreen(modifier: Modifier = Modifier, texto: String, navController: NavC
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(images) {
-                    Box {
+                    Box(
+                        modifier = Modifier.clickable {
+                            navController.navigate("screen2/${it.drawable}")
+                        }
+                    ) {
                         Image(
                             painter = painterResource(it.drawable),
                             contentDescription = null,
